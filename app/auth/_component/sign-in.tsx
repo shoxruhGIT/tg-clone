@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useAuth } from "@/hooks/use-auth";
 import { emailSchema } from "@/lib/validation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import React from "react";
@@ -22,8 +23,11 @@ export default function SignIn() {
     defaultValues: { email: "" },
   });
 
+  const { setEmail, setStep } = useAuth();
+
   function onSubmit(values: z.infer<typeof emailSchema>) {
-    console.log(values);
+    setStep("verify");
+    setEmail(values.email);
   }
 
   return (

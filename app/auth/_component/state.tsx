@@ -16,12 +16,15 @@ import { useForm } from "react-hook-form";
 import z from "zod";
 import SignIn from "./sign-in";
 import Verify from "./verify";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function StateAuth() {
+  const { step } = useAuth();
+
   return (
     <>
-      {/* <SignIn /> */}
-      <Verify />
+      {step === "login" && <SignIn />}
+      {step === "verify" && <Verify />}
     </>
   );
 }
