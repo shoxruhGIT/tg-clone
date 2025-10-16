@@ -1,13 +1,14 @@
 const authController = require("../controllers/auth.controller");
 
+// require("express-route-grouping");
+// require("express-group-routes");
+
 const router = require("express").Router();
 
-require("express-group-routes");
+router.post("/auth/login", authController.login);
+router.post("/auth/verify", authController.verify);
 
-router.post("/login", authController.login);
-router.post("/verify", authController.verify);
-
-router.get("/contacts", (req, res) => {
+router.get("/user/contacts", (req, res) => {
   res.json({ contacts: [] });
 });
 
