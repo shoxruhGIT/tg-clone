@@ -17,6 +17,7 @@
   "type": "commonjs",
   "dependencies": {
     "@forkjs/group-router": "^1.0.5",
+    "bcrypt": "^6.0.0",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
