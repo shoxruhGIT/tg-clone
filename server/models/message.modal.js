@@ -14,9 +14,7 @@ const messageSchema = new Schema(
     },
     reaction: { type: String },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 module.exports = model("Message", messageSchema);

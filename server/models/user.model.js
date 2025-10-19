@@ -11,10 +11,9 @@ const userScheme = new Schema(
     muted: { type: Boolean, default: false },
     notificationSound: { type: String, default: "notification.mp3" },
     sendingSound: { type: String, default: "sending.mp3" },
+    contacts: [{ type: Schema.Types.ObjectId, ref: "User" }],
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 module.exports = model("User", userScheme);
