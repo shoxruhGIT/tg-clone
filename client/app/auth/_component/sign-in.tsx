@@ -11,23 +11,47 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { axiosClient } from "@/http/axios";
 import { emailSchema } from "@/lib/validation";
+import { IError } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import React from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import z from "zod";
 
 export default function SignIn() {
+  const { setEmail, setStep } = useAuth();
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (email: string) => {
+      const { data } = await axiosClient.post<{ email: string }>(
+        "/api/auth/login",
+        { email }
+      );
+      return data;
+    },
+    onSuccess: (res) => {
+      setEmail(res.email);
+      setStep("verify");
+      toast.success("Verification code sent to your email.");
+    },
+    onError: (error: IError) => {
+      if (error.response?.data?.message) {
+        return toast.error(error.response.data.message);
+      }
+      return toast.error("Something went wrong. Please try again.");
+    },
+  });
+
   const form = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
     defaultValues: { email: "" },
   });
 
-  const { setEmail, setStep } = useAuth();
-
   function onSubmit(values: z.infer<typeof emailSchema>) {
-    setStep("verify");
-    setEmail(values.email);
+    mutate(values.email);
   }
 
   return (
@@ -47,6 +71,7 @@ export default function SignIn() {
                   <Input
                     placeholder="info@example.com"
                     className="h-10 bg-secondary"
+                    disabled={isPending}
                     {...field}
                   />
                 </FormControl>
@@ -58,6 +83,7 @@ export default function SignIn() {
             type="submit"
             size={"lg"}
             className="w-full cursor-pointer bg-blue-500 hover:bg-blue-600"
+            disabled={isPending}
           >
             Submit
           </Button>

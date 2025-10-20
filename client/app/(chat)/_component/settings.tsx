@@ -35,12 +35,15 @@ import {
   UserPlus,
   VolumeOff,
 } from "lucide-react";
+import { useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import React, { useState } from "react";
 
 export default function Settings() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
+
+  const { data } = useSession();
 
   return (
     <>
@@ -56,7 +59,7 @@ export default function Settings() {
         </PopoverTrigger>
         <PopoverContent className="p-0 w-80">
           <h2 className="pt-2 pl-2 text-muted-foreground">
-            Setting: <span className="text-white">info@example.com</span>
+            Setting: <span className="text-white">{data?.user?.email}</span>
           </h2>
           <Separator className="my-2" />
           <div className="flex flex-col [&>div]:flex [&>div]:justify-between [&>div]:items-center [&>div]:p-2 [&>div]:hover:bg-secondary [&>div]:cursor-pointer">

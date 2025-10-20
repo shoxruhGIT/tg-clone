@@ -9,12 +9,12 @@ class AuthController {
       const existUser = await userModel.findOne({ email });
       if (existUser) {
         await mailServer.sendOtp(existUser.email);
-        return res.status(200).json({ message: "existing_user" });
+        return res.status(200).json({ email: existUser.email });
       }
       const newUser = await userModel.create({ email });
       await mailServer.sendOtp(newUser.email);
 
-      res.status(200).json({ message: "new_user" });
+      res.status(200).json({ email: newUser.email });
     } catch (error) {
       next(error);
     }
@@ -25,8 +25,11 @@ class AuthController {
       const result = await mailServer.verifyOtp(email, otp);
 
       if (result) {
-        await userModel.findOneAndUpdate({ email }, { isVerified: true });
-        res.status(200).json({ message: "success" });
+        const user = await userModel.findOneAndUpdate(
+          { email },
+          { isVerified: true }
+        );
+        res.status(200).json({user});
       }
     } catch (error) {
       next(error);

@@ -1,15 +1,23 @@
 require("dotenv").config();
 
 const express = require("express");
-const cookieParser = require("cookie-parser");
+const cors = require("cors");
 const { default: mongoose } = require("mongoose");
 
 const app = express();
 
 // Middleware
+app.use(
+  cors({
+    origin: process.env.CLIENT_URL,
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  })
+);
 app.use(express.json());
 
 app.use("/api", require("./routes/index"));
+
+console.log("Client URL:", process.env.CLIENT_URL);
 
 const PORT = process.env.PORT || 6000;
 

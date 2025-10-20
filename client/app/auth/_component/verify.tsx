@@ -15,11 +15,17 @@ import {
 } from "@/components/ui/input-otp";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/hooks/use-auth";
+import { axiosClient } from "@/http/axios";
 import { otpSchema } from "@/lib/validation";
+import { IError, IUser } from "@/types";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { REGEXP_ONLY_DIGITS } from "input-otp";
+import { signIn } from "next-auth/react";
+import { userAgent } from "next/server";
 import React from "react";
 import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import z from "zod";
 
 export default function Verify() {
@@ -30,9 +36,29 @@ export default function Verify() {
     defaultValues: { email, otp: "" },
   });
 
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (otp: string) => {
+      const { data } = await axiosClient.post<{ user: IUser }>(
+        "/api/auth/verify",
+        { email, otp }
+      );
+      return data;
+    },
+    onSuccess: ({ user }) => {
+      signIn("credentials", { email: user.email, callbackUrl: "/" });
+      toast.success("Successfully verified");
+      console.log(user);
+    },
+    onError: (error: IError) => {
+      if (error.response?.data?.message) {
+        return toast.error(error.response.data.message);
+      }
+      return toast.error("Something went wrong");
+    },
+  });
+
   function onsubmit(values: z.infer<typeof otpSchema>) {
-    console.log(values);
-    window.open("/", "_self");  
+    mutate(values.otp);
   }
 
   return (
@@ -75,6 +101,7 @@ export default function Verify() {
                     maxLength={6}
                     className="w-full"
                     pattern={REGEXP_ONLY_DIGITS}
+                    disabled={isPending}
                     {...field}
                   >
                     <InputOTPGroup className="w-full ">
@@ -117,6 +144,7 @@ export default function Verify() {
             type="submit"
             size={"lg"}
             className="w-full cursor-pointer bg-blue-500 hover:bg-blue-600"
+            disabled={isPending}
           >
             Submit
           </Button>
