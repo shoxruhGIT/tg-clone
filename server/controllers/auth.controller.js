@@ -29,7 +29,7 @@ class AuthController {
           { email },
           { isVerified: true }
         );
-        res.status(200).json({user});
+        res.status(200).json({ user });
       }
     } catch (error) {
       next(error);

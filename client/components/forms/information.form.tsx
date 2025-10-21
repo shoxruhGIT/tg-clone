@@ -15,15 +15,40 @@ import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Textarea } from "../ui/textarea";
 import { Button } from "../ui/button";
+import { useMutation } from "@tanstack/react-query";
+import { useSession } from "next-auth/react";
+import { generateToken } from "@/lib/generate-token";
+import { axiosClient } from "@/http/axios";
+import { toast } from "sonner";
 
 const InformationForm = () => {
+  const { data: session, update } = useSession();
+
   const form = useForm<z.infer<typeof profileSchema>>({
     resolver: zodResolver(profileSchema),
-    defaultValues: { firstName: "", lastName: "", bio: "" },
+    defaultValues: {
+      firstName: session?.currentUser?.firstName,
+      lastName: session?.currentUser?.lastName,
+      bio: session?.currentUser?.bio,
+    },
+  });
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (payload: z.infer<typeof profileSchema>) => {
+      const token = await generateToken(session?.currentUser?._id);
+      const { data } = await axiosClient.put("/api/user/profile", payload, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Profile updated successfully");
+      update();
+    },
   });
 
   const onSubmit = (data: z.infer<typeof profileSchema>) => {
-    console.log(data);
+    mutate(data);
   };
 
   return (
@@ -39,6 +64,7 @@ const InformationForm = () => {
                 <Input
                   placeholder="Shoxruh"
                   className="bg-secondary"
+                  disabled={isPending}
                   {...field}
                 />
               </FormControl>
@@ -56,6 +82,7 @@ const InformationForm = () => {
                 <Input
                   placeholder="Quvondiqov"
                   className="bg-secondary"
+                  disabled={isPending}
                   {...field}
                 />
               </FormControl>
@@ -72,13 +99,18 @@ const InformationForm = () => {
                 <Textarea
                   placeholder="Enter anyhting about yourself"
                   className="bg-secondary"
+                  disabled={isPending}
                   {...field}
                 />
               </FormControl>
             </FormItem>
           )}
         />
-        <Button type="submit" className="w-full cursor-pointer">
+        <Button
+          type="submit"
+          className="w-full cursor-pointer"
+          disabled={isPending}
+        >
           Submit
         </Button>
       </form>

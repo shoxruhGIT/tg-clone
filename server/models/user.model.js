@@ -8,7 +8,7 @@ const userScheme = new Schema(
     lastName: { type: String },
     bio: { type: String },
     avatar: { type: String },
-    muted: { type: Boolean, default: false },
+    muted: { type: Boolean, default: true },
     notificationSound: { type: String, default: "notification.mp3" },
     sendingSound: { type: String, default: "sending.mp3" },
     contacts: [{ type: Schema.Types.ObjectId, ref: "User" }],

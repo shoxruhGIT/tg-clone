@@ -22,15 +22,36 @@ import {
   FormMessage,
 } from "../ui/form";
 import { Input } from "../ui/input";
+import { signOut, useSession } from "next-auth/react";
+import { useMutation } from "@tanstack/react-query";
+import { generateToken } from "@/lib/generate-token";
+import { axiosClient } from "@/http/axios";
+import { toast } from "sonner";
 
 const DangerZoneForm = () => {
+  const { data: session } = useSession();
+
   const form = useForm<z.infer<typeof confirmTextScheme>>({
     resolver: zodResolver(confirmTextScheme),
     defaultValues: { confirmText: "" },
   });
 
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => {
+      const token = await generateToken(session?.currentUser?._id);
+      const { data } = await axiosClient.delete("/api/user", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Account deleted successfully");
+      signOut();
+    },
+  });
+
   function onSubmit(values: z.infer<typeof confirmTextScheme>) {
-    console.log(values);
+    mutate();
   }
 
   return (
@@ -72,13 +93,20 @@ const DangerZoneForm = () => {
                       confirm.
                     </FormDescription>
                     <FormControl>
-                      <Input className="bg-secondary" {...field} />
+                      <Input
+                        className="bg-secondary"
+                        disabled={isPending}
+                        {...field}
+                      />
                     </FormControl>
                     <FormMessage className="text-xs text-red-500" />
                   </FormItem>
                 )}
               />
-              <Button className="w-full font-bold cursor-pointer">
+              <Button
+                className="w-full font-bold cursor-pointer"
+                disabled={isPending}
+              >
                 Submit
               </Button>
             </form>

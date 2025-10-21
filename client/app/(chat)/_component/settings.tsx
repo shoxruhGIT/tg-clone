@@ -25,6 +25,10 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import { Switch } from "@/components/ui/switch";
+import { axiosClient } from "@/http/axios";
+import { generateToken } from "@/lib/generate-token";
+import { useMutation } from "@tanstack/react-query";
 import {
   LogIn,
   Menu,
@@ -35,15 +39,32 @@ import {
   UserPlus,
   VolumeOff,
 } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import { useTheme } from "next-themes";
 import React, { useState } from "react";
+import { toast } from "sonner";
 
 export default function Settings() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const { resolvedTheme, setTheme } = useTheme();
 
-  const { data } = useSession();
+  const { data: session, update } = useSession();
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (muted: boolean) => {
+      const token = await generateToken(session?.currentUser?._id);
+      const { data } = await axiosClient.put(
+        "/api/user/profile",
+        { muted },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("User profile updated successfully");
+      update();
+    },
+  });
 
   return (
     <>
@@ -59,7 +80,7 @@ export default function Settings() {
         </PopoverTrigger>
         <PopoverContent className="p-0 w-80">
           <h2 className="pt-2 pl-2 text-muted-foreground">
-            Setting: <span className="text-white">{data?.user?.email}</span>
+            Setting: <span className="text-white">{session?.user?.email}</span>
           </h2>
           <Separator className="my-2" />
           <div className="flex flex-col [&>div]:flex [&>div]:justify-between [&>div]:items-center [&>div]:p-2 [&>div]:hover:bg-secondary [&>div]:cursor-pointer">
@@ -70,7 +91,10 @@ export default function Settings() {
               </div>
             </div>
             <div>
-              <div className="flex items-center gap-1">
+              <div
+                className="flex items-center gap-1"
+                onClick={() => window.location.reload()}
+              >
                 <UserPlus size={16} />
                 <span className="text-sm">Create contact</span>
               </div>
@@ -80,6 +104,12 @@ export default function Settings() {
                 <VolumeOff size={16} />
                 <span className="text-sm">Mute</span>
               </div>
+              <Switch
+                className="curpor-pointer"
+                checked={!session?.currentUser?.muted}
+                onCheckedChange={() => mutate(!session?.currentUser?.muted)}
+                disabled={isPending}
+              />
             </div>
             <div>
               <div className="flex items-center gap-1">
@@ -92,9 +122,20 @@ export default function Settings() {
                   {resolvedTheme === "dark" ? "Light mode" : "Dark mode"}
                 </span>
               </div>
+              <Switch
+                checked={resolvedTheme === "dark" ? true : false}
+                onCheckedChange={() =>
+                  setTheme(resolvedTheme === "dark" ? "light" : "dark")
+                }
+              />
             </div>
             <div>
-              <div className="flex items-center gap-1">
+              <div
+                className="flex items-center gap-1"
+                onClick={() => {
+                  signOut();
+                }}
+              >
                 <LogIn size={16} />
                 <span className="text-sm">Logout</span>
               </div>
