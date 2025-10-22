@@ -41,7 +41,7 @@ class UserController {
 
   async getMessages(req, res, next) {
     try {
-      const user = "68f27d6dd1f882c419c42191";
+      const user = req.user._id;
       const { contactId } = req.params;
 
       console.log(contactId);
@@ -57,7 +57,7 @@ class UserController {
         .populate({ path: "receiver", select: "email" });
 
       await messageModel.updateMany(
-        { sender: contactId, receiver: user, status: "SENT" },
+        { sender: contactId, receiver: user, status: CONST.SENT },
         { status: CONST.READ }
       );
 
@@ -70,12 +70,21 @@ class UserController {
   // [POST]
   async createMessage(req, res, next) {
     try {
-      const newMessage = await messageModel.create(req.body);
-      const currentMessage = await messageModel
-        .findById(newMessage._id)
-        .populate({ path: "sender", select: "email" })
-        .populate({ path: "receiver", select: "email" });
-      res.status(201).json({ newMessage: currentMessage });
+      const userId = req.user._id;
+      const createdMessage = await messageModel.create({
+        ...req.body,
+        sender: userId,
+      });
+
+      const newMessage = await messageModel
+        .findById(createdMessage._id)
+        .populate({ path: "sender" })
+        .populate({ path: "receiver" });
+
+      const receiver = await userModel.findById(createdMessage.receiver);
+      const sender = await userModel.findById(createdMessage.sender);
+
+      res.status(201).json({ newMessage, receiver, sender });
     } catch (error) {
       next(error);
     }

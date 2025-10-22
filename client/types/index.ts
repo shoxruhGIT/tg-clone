@@ -19,3 +19,14 @@ export interface ChildProps {
 export interface IError {
   response: { data: { message: string } };
 }
+
+export interface IMessage {
+  _id: string;
+  text: string;
+  image: string;
+  reaction: string;
+  sender: IUser;
+  receiver: IUser;
+  createdAt: string;
+  updatedAt: string;
+}

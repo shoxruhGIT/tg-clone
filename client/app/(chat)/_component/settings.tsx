@@ -106,7 +106,7 @@ export default function Settings() {
               </div>
               <Switch
                 className="curpor-pointer"
-                checked={!session?.currentUser?.muted}
+                checked={session?.currentUser?.muted}
                 onCheckedChange={() =>
                   mutate({ muted: !session?.currentUser?.muted })
                 }

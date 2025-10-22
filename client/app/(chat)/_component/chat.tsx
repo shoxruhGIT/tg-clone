@@ -14,15 +14,22 @@ import { UseFormReturn } from "react-hook-form";
 import z from "zod";
 import data from "@emoji-mart/data";
 import Picker from "@emoji-mart/react";
+import { IMessage } from "@/types";
+import MessageCard from "@/components/cards/message.card";
+import { useLoading } from "@/hooks/use-loading";
+import ChatLoading from "@/components/loadings/chat.loading";
 
 interface ChatProps {
   onSendMessage: (values: z.infer<typeof messageSchema>) => void;
   messageForm: UseFormReturn<z.infer<typeof messageSchema>>;
+  messages: IMessage[];
 }
 
-const Chat = ({ onSendMessage, messageForm }: ChatProps) => {
+const Chat = ({ onSendMessage, messageForm, messages }: ChatProps) => {
   const { resolvedTheme } = useTheme();
   const inputRef = useRef<HTMLInputElement | null>(null);
+
+  const { loadMessages } = useLoading();
 
   const handleEmojiSelect = (emoji: string) => {
     const input = inputRef.current;
@@ -43,6 +50,26 @@ const Chat = ({ onSendMessage, messageForm }: ChatProps) => {
 
   return (
     <div className="flex flex-col justify-end z-40 min-h-[92vh]">
+      {/* Loading */}
+      {loadMessages && <ChatLoading />}
+
+      {/* Messages */}
+      {messages?.map((message, index) => (
+        <MessageCard key={index} message={message} />
+      ))}
+
+      {/* Start conversation */}
+      {messages?.length === 0 && (
+        <div className="w-full h-[88vh] flex items-center justify-center">
+          <div
+            className="text-[100px] cursor-pointer"
+            onClick={() => onSendMessage({ text: "✋" })}
+          >
+            ✋
+          </div>
+        </div>
+      )}
+
       <Form {...messageForm}>
         <form
           onSubmit={messageForm.handleSubmit(onSendMessage)}
