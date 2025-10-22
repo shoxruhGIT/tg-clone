@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import ContactList from "./_component/contact-list";
 import { useCurrentContact } from "@/hooks/use-current";
 import { useRouter } from "next/navigation";
@@ -11,10 +11,65 @@ import z from "zod";
 import AddContact from "./_component/add-contact";
 import TopChat from "./_component/top-chat";
 import Chat from "./_component/chat";
+import { IUser } from "@/types";
+import { useLoading } from "@/hooks/use-loading";
+import { useSession } from "next-auth/react";
+import { axiosClient } from "@/http/axios";
+import { generateToken } from "@/lib/generate-token";
+import { toast } from "sonner";
+import { Loader2 } from "lucide-react";
+import { useAuth } from "@/hooks/use-auth";
+import { io } from "socket.io-client";
 
 const HomePage = () => {
+  const [contacts, setContacts] = useState<IUser[]>([]);
+
+  const { setIsLoading, isLoading, setIsCreating } = useLoading();
+
   const { currentContact } = useCurrentContact();
+  const { data: session } = useSession();
+  const { setOnlineUsers } = useAuth();
+
   const router = useRouter();
+  const socket = useRef<ReturnType<typeof io>>(null);
+
+  const getContacts = async () => {
+    setIsLoading(true);
+    try {
+      const token = await generateToken(session?.currentUser?._id);
+      const { data } = await axiosClient.get<{ contacts: IUser[] }>(
+        "/api/user/contacts",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setContacts(data.contacts);
+    } catch (error) {
+      toast.error("Failed to load contacts");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    router.push("/");
+    socket.current = io("ws://localhost:5000");
+  }, []);
+
+  useEffect(() => {
+    if (session?.currentUser?._id) {
+      socket.current?.emit("addOnlineUser", session.currentUser);
+      socket.current?.on(
+        "getOnlineUsers",
+        (data: { socketId: string; user: IUser }[]) => {
+          setOnlineUsers(data.map((item) => item.user));
+        }
+      );
+      getContacts();
+    }
+  }, [session?.currentUser]);
 
   const contactForm = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
@@ -26,14 +81,31 @@ const HomePage = () => {
     defaultValues: { text: "", image: "" },
   });
 
-  useEffect(() => {
-    if (!currentContact) {
-      router.push("/");
-    }
-  }, []);
+  const onCreateContact = async (values: z.infer<typeof emailSchema>) => {
+    setIsCreating(true);
 
-  const onCreateContact = (values: z.infer<typeof emailSchema>) => {
-    console.log(values);
+    const token = await generateToken(session?.currentUser?._id);
+    try {
+      const { data } = await axiosClient.post<{ contacts: IUser }>(
+        "/api/user/contact",
+        values,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+      setContacts((prev) => [...prev, data.contacts]);
+      toast.success("Contact created successfully");
+      contactForm.reset();
+    } catch (error: any) {
+      if (error.response?.data?.message) {
+        return toast.error(error.response.data.message);
+      }
+      return toast.error("Something went wrong");
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const onSendMessage = (values: z.infer<typeof messageSchema>) => {
@@ -42,10 +114,21 @@ const HomePage = () => {
 
   return (
     <>
+      {/* Sidebar */}
       <div className="w-80 h-screen border-r fixed inset-0 z-50">
-        <ContactList contacts={contacts} />
+        {/* Loading */}
+        {isLoading && (
+          <div className="w-full h-[95vh] flex justify-center items-center">
+            <Loader2 size={50} className="animate-spin" />
+          </div>
+        )}
+
+        {/* Contact list */}
+        {!isLoading && <ContactList contacts={contacts} />}
       </div>
+      {/* Chat area */}
       <div className="pl-80 w-full">
+        {/* Add contact */}
         {!currentContact?._id && (
           <AddContact
             contactForm={contactForm}
@@ -53,31 +136,18 @@ const HomePage = () => {
           />
         )}
 
+        {/* Chat */}
         {currentContact?._id && (
           <div className="w-full relative">
+            {/*Top Chat  */}
             <TopChat />
-
-            <Chat onSendMessage={onSendMessage} messageForm={messageForm} />
+            {/* Chat messages */}
+            <Chat messageForm={messageForm} onSendMessage={onSendMessage} />
           </div>
         )}
       </div>
     </>
   );
 };
-
-const contacts = [
-  {
-    email: "john@gmail.com",
-    _id: "1",
-    avatar: "https://github.com/shadcn.png",
-    firstName: "John",
-    lastName: "Doe",
-    bio: "Lorem ipsum dolor, sit amet consectetur adipisicing elit. Quis repellat blanditiis hic reiciendis quibusdam voluptatem necessitatibus, minus sint maxime iste impedit cupiditate ab provident doloremque sed dicta, molestias nemo cum.",
-  },
-  { email: "amile@gmail.com", _id: "2" },
-  { email: "faris@gmail.com", _id: "3" },
-  { email: "abdo@gmail.com", _id: "4" },
-  { email: "billi@gmail.com", _id: "5" },
-];
 
 export default HomePage;
