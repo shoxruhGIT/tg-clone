@@ -17,8 +17,7 @@ import React from "react";
 const TopChat = () => {
   const { currentContact } = useCurrentContact();
 
-  const { onlineUsers } = useAuth();
-  console.log(onlineUsers);
+  const onlineUsers = useAuth((s) => s.onlineUsers);
 
   return (
     <div className="w-full flex items-center justify-between sticky top-0 z-50 h-[8vh] p-2 bg-background">

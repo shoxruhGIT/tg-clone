@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import ContactList from "./_component/contact-list";
 import { useCurrentContact } from "@/hooks/use-current";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { emailSchema, messageSchema } from "@/lib/validation";
@@ -21,10 +21,12 @@ import { Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { io } from "socket.io-client";
 import useAudio from "@/hooks/use-audio";
+import { CONST } from "@/lib/constants";
 
 const HomePage = () => {
   const [contacts, setContacts] = useState<IUser[]>([]);
   const [messages, setMessages] = useState<IMessage[]>([]);
+  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   const { setIsLoading, isLoading, setIsCreating, setLoadMessages } =
     useLoading();
@@ -35,7 +37,10 @@ const HomePage = () => {
   const { playSound } = useAudio();
 
   const router = useRouter();
+  const searchParams = useSearchParams();
   const socket = useRef<ReturnType<typeof io>>(null);
+
+  const CONTACT_ID = searchParams.get("chat");
 
   const contactForm = useForm<z.infer<typeof emailSchema>>({
     resolver: zodResolver(emailSchema),
@@ -79,6 +84,18 @@ const HomePage = () => {
         }
       );
       setMessages(data.messages);
+      setContacts((prev) =>
+        prev.map((item) =>
+          item._id === currentContact?._id
+            ? {
+                ...item,
+                lastMessage: item.lastMessage
+                  ? { ...item.lastMessage, status: CONST.READ }
+                  : null,
+              }
+            : item
+        )
+      );
     } catch {
       toast.error("Failed to load message");
     } finally {
@@ -89,7 +106,15 @@ const HomePage = () => {
   useEffect(() => {
     router.push("/");
     socket.current = io("ws://localhost:5000");
+    return () => {
+      socket.current?.disconnect();
+    };
   }, []);
+  useEffect(() => {
+    if (currentContact?._id) {
+      getMessages();
+    }
+  }, [currentContact?._id]);
 
   useEffect(() => {
     if (session?.currentUser?._id) {
@@ -120,20 +145,41 @@ const HomePage = () => {
             const isExist = prev.some((item) => item._id === newMessage._id);
             return isExist ? prev : [...prev, newMessage];
           });
-          toast.success(`${sender?.email.split("@")[0]} sent you a message`);
+
+          setContacts((prev) => {
+            return prev.map((contact) => {
+              if (contact._id === sender._id) {
+                return {
+                  ...contact,
+                  lastMessage: {
+                    ...newMessage,
+                    status:
+                      CONTACT_ID === sender._id
+                        ? CONST.READ
+                        : newMessage.status,
+                  },
+                };
+              }
+              return contact;
+            });
+          });
+
           if (!receiver.muted) {
             playSound(receiver.notificationSound);
           }
         }
       );
-    }
-  }, [session?.currentUser, socket]);
 
-  useEffect(() => {
-    if (currentContact?._id) {
-      getMessages();
+      socket.current?.on("getReadMessages", (messages: IMessage[]) => {
+        setMessages((prev) => {
+          return prev.map((item) => {
+            const message = messages.find((msg) => msg._id === item._id);
+            return message ? { ...item, status: CONST.READ } : item;
+          });
+        });
+      });
     }
-  }, [currentContact]);
+  }, [session?.currentUser, CONTACT_ID]);
 
   const onCreateContact = async (values: z.infer<typeof emailSchema>) => {
     setIsCreating(true);
@@ -167,7 +213,7 @@ const HomePage = () => {
   };
 
   const onSendMessage = async (values: z.infer<typeof messageSchema>) => {
-    setIsCreating(true);
+    setIsSendingMessage(true);
     const token = await generateToken(session?.currentUser?._id);
     try {
       const { data } = await axiosClient.post<GetSocketType>(
@@ -179,6 +225,16 @@ const HomePage = () => {
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setMessages((prev) => [...prev, data.newMessage]);
+      setContacts((prev) =>
+        prev.map((msg) =>
+          msg._id === currentContact?._id
+            ? {
+                ...msg,
+                lastMessage: { ...data.newMessage, status: CONST.READ },
+              }
+            : msg
+        )
+      );
       messageForm.reset();
       socket.current?.emit("sendMessage", {
         newMessage: data.newMessage,
@@ -188,7 +244,35 @@ const HomePage = () => {
     } catch (error) {
       toast.error("Connot send message");
     } finally {
-      setIsCreating(false);
+      setIsSendingMessage(false);
+    }
+  };
+
+  const onReadMessage = async () => {
+    const receivedMsg = messages
+      .filter((msg) => msg.receiver._id === session?.currentUser?._id)
+      .filter((msg) => msg.status !== CONST.READ);
+
+    if (receivedMsg.length === 0) return;
+    const token = await generateToken(session?.currentUser?._id);
+    try {
+      const { data } = await axiosClient.post<{ messages: IMessage[] }>(
+        "/api/user/message-read",
+        { messages: receivedMsg },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      socket.current?.emit("readMessages", {
+        messages: data.messages,
+        receiver: currentContact,
+      });
+      setMessages((prev) => {
+        return prev.map((item) => {
+          const message = data.messages.find((msg) => msg._id === item._id);
+          return message ? { ...item, status: CONST.READ } : item;
+        });
+      });
+    } catch (error) {
+      toast.error("Cannot read messages");
     }
   };
 
@@ -226,6 +310,7 @@ const HomePage = () => {
               messageForm={messageForm}
               onSendMessage={onSendMessage}
               messages={messages}
+              onReadMessages={onReadMessage}
             />
           </div>
         )}

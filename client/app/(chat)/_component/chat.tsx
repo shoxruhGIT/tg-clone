@@ -1,39 +1,49 @@
+import MessageCard from "@/components/cards/message.card";
+import ChatLoading from "@/components/loadings/chat.loading";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { messageSchema } from "@/lib/validation";
+import { Paperclip, Send, Smile } from "lucide-react";
+import { FC, useEffect, useRef } from "react";
+import { UseFormReturn } from "react-hook-form";
+import { z } from "zod";
+import emojies from "@emoji-mart/data";
+import Picker from "@emoji-mart/react";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { messageSchema } from "@/lib/validation";
-import { Paperclip, Send, Smile } from "lucide-react";
 import { useTheme } from "next-themes";
-import React, { useRef } from "react";
-import { UseFormReturn } from "react-hook-form";
-import z from "zod";
-import data from "@emoji-mart/data";
-import Picker from "@emoji-mart/react";
-import { IMessage } from "@/types";
-import MessageCard from "@/components/cards/message.card";
 import { useLoading } from "@/hooks/use-loading";
-import ChatLoading from "@/components/loadings/chat.loading";
+import { IMessage } from "@/types";
 
-interface ChatProps {
-  onSendMessage: (values: z.infer<typeof messageSchema>) => void;
+interface Props {
+  onSendMessage: (values: z.infer<typeof messageSchema>) => Promise<void>;
+  onReadMessages: () => Promise<void>;
   messageForm: UseFormReturn<z.infer<typeof messageSchema>>;
   messages: IMessage[];
 }
+const Chat: FC<Props> = ({
+  onSendMessage,
+  messageForm,
+  messages,
+  onReadMessages,
+}) => {
+  const { loadMessages } = useLoading();
 
-const Chat = ({ onSendMessage, messageForm, messages }: ChatProps) => {
   const { resolvedTheme } = useTheme();
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const scrollRef = useRef<HTMLFormElement | null>(null);
 
-  const { loadMessages } = useLoading();
+  useEffect(() => {
+    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    onReadMessages();
+  }, [messages]);
 
   const handleEmojiSelect = (emoji: string) => {
     const input = inputRef.current;
-
     if (!input) return;
 
     const text = messageForm.getValues("text");
@@ -45,7 +55,7 @@ const Chat = ({ onSendMessage, messageForm, messages }: ChatProps) => {
 
     setTimeout(() => {
       input.setSelectionRange(start + emoji.length, start + emoji.length);
-    });
+    }, 0);
   };
 
   return (
@@ -54,12 +64,12 @@ const Chat = ({ onSendMessage, messageForm, messages }: ChatProps) => {
       {loadMessages && <ChatLoading />}
 
       {/* Messages */}
-      {messages?.map((message, index) => (
+      {messages.map((message, index) => (
         <MessageCard key={index} message={message} />
       ))}
 
       {/* Start conversation */}
-      {messages?.length === 0 && (
+      {messages.length === 0 && (
         <div className="w-full h-[88vh] flex items-center justify-center">
           <div
             className="text-[100px] cursor-pointer"
@@ -70,16 +80,14 @@ const Chat = ({ onSendMessage, messageForm, messages }: ChatProps) => {
         </div>
       )}
 
+      {/* Message input */}
       <Form {...messageForm}>
         <form
           onSubmit={messageForm.handleSubmit(onSendMessage)}
           className="w-full flex relative"
+          ref={scrollRef}
         >
-          <Button
-            size={"icon"}
-            variant="secondary"
-            className="cursor-pointer rounded-none"
-          >
+          <Button size={"icon"} type="button" variant={"secondary"}>
             <Paperclip />
           </Button>
           <FormField
@@ -89,7 +97,7 @@ const Chat = ({ onSendMessage, messageForm, messages }: ChatProps) => {
               <FormItem className="w-full">
                 <FormControl>
                   <Input
-                    className="bg-secondary border-l border-l-muted-foreground border-r border-r-muted-foreground h-9 rounded-none"
+                    className="bg-secondary border-l border-l-muted-foreground border-r border-r-muted-foreground h-9"
                     placeholder="Type a message"
                     value={field.value}
                     onBlur={() => field.onBlur()}
@@ -102,17 +110,13 @@ const Chat = ({ onSendMessage, messageForm, messages }: ChatProps) => {
           />
           <Popover>
             <PopoverTrigger asChild>
-              <Button
-                size={"icon"}
-                variant="secondary"
-                className="cursor-pointer rounded-none"
-              >
+              <Button size="icon" type="button" variant="secondary">
                 <Smile />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="p-0 border-none rounded-md absolute right-6 bottom-0">
               <Picker
-                data={data}
+                data={emojies}
                 theme={resolvedTheme === "dark" ? "dark" : "light"}
                 onEmojiSelect={(emoji: { native: string }) =>
                   handleEmojiSelect(emoji.native)
@@ -121,11 +125,7 @@ const Chat = ({ onSendMessage, messageForm, messages }: ChatProps) => {
             </PopoverContent>
           </Popover>
 
-          <Button
-            type="submit"
-            size={"icon"}
-            className="cursor-pointer rounded-none bg-blue-500 hover:bg-blue-600"
-          >
+          <Button type="submit" size={"icon"}>
             <Send />
           </Button>
         </form>

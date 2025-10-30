@@ -10,6 +10,7 @@ export interface IUser {
   notificationSound: string;
   sendingSound: string;
   contacts: IUser[];
+  lastMessage: IMessage | null;
 }
 
 export interface ChildProps {
@@ -25,6 +26,7 @@ export interface IMessage {
   text: string;
   image: string;
   reaction: string;
+  status: string;
   sender: IUser;
   receiver: IUser;
   createdAt: string;

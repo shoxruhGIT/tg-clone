@@ -1,5 +1,4 @@
 import { IUser } from "@/types";
-import { email } from "zod";
 import { create } from "zustand";
 
 type Store = {

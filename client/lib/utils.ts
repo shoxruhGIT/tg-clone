@@ -1,4 +1,5 @@
 import { clsx, type ClassValue } from "clsx";
+import { text } from "stream/consumers";
 import { twMerge } from "tailwind-merge";
 
 export function cn(...inputs: ClassValue[]) {
@@ -18,4 +19,8 @@ export const getSoundLabel = (value: string) => {
     default:
       return "";
   }
+};
+
+export const sliceText = (text: string, length: number) => {
+  return text.length > length ? `${text.slice(0, length)}...` : text;
 };
