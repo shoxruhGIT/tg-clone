@@ -26,12 +26,12 @@ import { CONST } from "@/lib/constants";
 const HomePage = () => {
   const [contacts, setContacts] = useState<IUser[]>([]);
   const [messages, setMessages] = useState<IMessage[]>([]);
-  const [isSendingMessage, setIsSendingMessage] = useState(false);
 
   const { setIsLoading, isLoading, setIsCreating, setLoadMessages } =
     useLoading();
 
-  const { currentContact } = useCurrentContact();
+  const { currentContact, editedMessage, setEditedMessage } =
+    useCurrentContact();
   const { data: session } = useSession();
   const { setOnlineUsers } = useAuth();
   const { playSound } = useAudio();
@@ -103,6 +103,7 @@ const HomePage = () => {
     }
   };
 
+  // use effect for socket
   useEffect(() => {
     router.push("/");
     socket.current = io("ws://localhost:5000");
@@ -110,12 +111,15 @@ const HomePage = () => {
       socket.current?.disconnect();
     };
   }, []);
+
+  // use effect for getMessage function
   useEffect(() => {
     if (currentContact?._id) {
       getMessages();
     }
   }, [currentContact?._id]);
 
+  // use effect for getContacts function
   useEffect(() => {
     if (session?.currentUser?._id) {
       socket.current?.emit("addOnlineUser", session.currentUser);
@@ -129,6 +133,7 @@ const HomePage = () => {
     }
   }, [session?.currentUser]);
 
+  // use effect for write socket.current?.on
   useEffect(() => {
     if (session?.currentUser) {
       socket.current?.on("getCreatedUser", (user) => {
@@ -138,6 +143,7 @@ const HomePage = () => {
         });
       });
 
+      // socket getNewMessage
       socket.current?.on(
         "getNewMessage",
         ({ newMessage, sender, receiver }: GetSocketType) => {
@@ -170,6 +176,7 @@ const HomePage = () => {
         }
       );
 
+      // socket getReadMessages
       socket.current?.on("getReadMessages", (messages: IMessage[]) => {
         setMessages((prev) => {
           return prev.map((item) => {
@@ -178,6 +185,37 @@ const HomePage = () => {
           });
         });
       });
+
+      // socket getUpdateMessage
+      socket.current?.on(
+        "getUpdatedMessage",
+        ({ updatedMessage, sender }: GetSocketType) => {
+          setMessages((prev) =>
+            prev.map((item) =>
+              item._id === updatedMessage._id
+                ? {
+                    ...item,
+                    reaction: updatedMessage.reaction,
+                    text: updatedMessage.text,
+                  }
+                : item
+            )
+          );
+          setContacts((prev) =>
+            prev.map((item) =>
+              item._id === sender._id
+                ? {
+                    ...item,
+                    lastMessage:
+                      item.lastMessage?._id === updatedMessage._id
+                        ? updatedMessage
+                        : item.lastMessage,
+                  }
+                : item
+            )
+          );
+        }
+      );
     }
   }, [session?.currentUser, CONTACT_ID]);
 
@@ -212,8 +250,17 @@ const HomePage = () => {
     }
   };
 
+  const onSubmitMessage = async (values: z.infer<typeof messageSchema>) => {
+    setIsCreating(true);
+    if (editedMessage?._id) {
+      onEditMessage(editedMessage._id, values.text);
+    } else {
+      onSendMessage(values);
+    }
+  };
+
   const onSendMessage = async (values: z.infer<typeof messageSchema>) => {
-    setIsSendingMessage(true);
+    setIsCreating(true);
     const token = await generateToken(session?.currentUser?._id);
     try {
       const { data } = await axiosClient.post<GetSocketType>(
@@ -244,7 +291,7 @@ const HomePage = () => {
     } catch (error) {
       toast.error("Connot send message");
     } finally {
-      setIsSendingMessage(false);
+      setIsCreating(false);
     }
   };
 
@@ -273,6 +320,46 @@ const HomePage = () => {
       });
     } catch (error) {
       toast.error("Cannot read messages");
+    }
+  };
+
+  const onEditMessage = async (messageId: string, text: string) => {
+    const token = await generateToken(session?.currentUser?._id);
+    try {
+      const { data } = await axiosClient.put<{ updatedMessage: IMessage }>(
+        `/api/user/message/${messageId}`,
+        { text },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setMessages((prev) =>
+        prev.map((item) =>
+          item._id === data.updatedMessage._id
+            ? { ...item, text: data.updatedMessage.text }
+            : item
+        )
+      );
+      socket.current?.emit("updateMessage", {
+        updatedMessage: data.updatedMessage,
+        receiver: currentContact,
+        sender: session?.currentUser,
+      });
+      messageForm.reset();
+      setContacts((prev) =>
+        prev.map((item) =>
+          item._id === currentContact?._id
+            ? {
+                ...item,
+                lastMessage:
+                  item.lastMessage?._id === messageId
+                    ? data.updatedMessage
+                    : item.lastMessage,
+              }
+            : item
+        )
+      );
+      setEditedMessage(null);
+    } catch {
+      toast.error("Cannot edit message");
     }
   };
 
@@ -308,7 +395,7 @@ const HomePage = () => {
             {/* Chat messages */}
             <Chat
               messageForm={messageForm}
-              onSendMessage={onSendMessage}
+              onSubmitMessage={onSubmitMessage}
               messages={messages}
               onReadMessages={onReadMessage}
             />
@@ -325,4 +412,7 @@ interface GetSocketType {
   receiver: IUser;
   sender: IUser;
   newMessage: IMessage;
+  updatedMessage: IMessage;
+  deletedMessage: IMessage;
+  filteredMessage: IMessage[];
 }

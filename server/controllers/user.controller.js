@@ -221,8 +221,8 @@ class UserController {
   async deleteMessage(req, res, next) {
     try {
       const { messageId } = req.params;
-      await messageModel.findByIdAndDelete(messageId);
-      res.status(200).json({ message: "Message deleted" });
+      const deleteMessage = await messageModel.findByIdAndDelete(messageId);
+      res.status(200).json({ deleteMessage });
     } catch (error) {
       next(error);
     }

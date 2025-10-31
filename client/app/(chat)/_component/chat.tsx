@@ -18,20 +18,23 @@ import {
 import { useTheme } from "next-themes";
 import { useLoading } from "@/hooks/use-loading";
 import { IMessage } from "@/types";
+import { useCurrentContact } from "@/hooks/use-current";
 
 interface Props {
-  onSendMessage: (values: z.infer<typeof messageSchema>) => Promise<void>;
+  onSubmitMessage: (values: z.infer<typeof messageSchema>) => Promise<void>;
   onReadMessages: () => Promise<void>;
   messageForm: UseFormReturn<z.infer<typeof messageSchema>>;
   messages: IMessage[];
 }
 const Chat: FC<Props> = ({
-  onSendMessage,
+  onSubmitMessage,
   messageForm,
   messages,
   onReadMessages,
 }) => {
   const { loadMessages } = useLoading();
+
+  const { editedMessage } = useCurrentContact();
 
   const { resolvedTheme } = useTheme();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -41,6 +44,13 @@ const Chat: FC<Props> = ({
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
     onReadMessages();
   }, [messages]);
+
+  useEffect(() => {
+    if (editedMessage) {
+      messageForm.setValue("text", editedMessage.text);
+      scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [editedMessage]);
 
   const handleEmojiSelect = (emoji: string) => {
     const input = inputRef.current;
@@ -73,7 +83,7 @@ const Chat: FC<Props> = ({
         <div className="w-full h-[88vh] flex items-center justify-center">
           <div
             className="text-[100px] cursor-pointer"
-            onClick={() => onSendMessage({ text: "✋" })}
+            onClick={() => onSubmitMessage({ text: "✋" })}
           >
             ✋
           </div>
@@ -83,7 +93,7 @@ const Chat: FC<Props> = ({
       {/* Message input */}
       <Form {...messageForm}>
         <form
-          onSubmit={messageForm.handleSubmit(onSendMessage)}
+          onSubmit={messageForm.handleSubmit(onSubmitMessage)}
           className="w-full flex relative"
           ref={scrollRef}
         >
